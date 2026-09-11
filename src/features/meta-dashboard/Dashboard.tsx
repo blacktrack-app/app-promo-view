@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   ArrowDown, ArrowUp, ArrowUpDown, DollarSign, Download, Eye, LogOut, MousePointerClick,
-  Percent, RefreshCw, Search, Settings, Smartphone, TrendingDown, TriangleAlert,
+  Percent, RefreshCw, Search, Settings, TrendingDown, TriangleAlert,
 } from "lucide-react";
 import {
   Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,
