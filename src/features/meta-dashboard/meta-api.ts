@@ -58,8 +58,13 @@ async function request<T>(path: string, params: Record<string, string>, token: s
 const timeRange = (range: DateRange) => JSON.stringify(range);
 
 export async function testMetaConnection(token: string) {
-  const rows = await request<{ name: string }>("me", { fields: "name" }, token);
-  return rows[0]?.name ?? "Conta conectada";
+  const query = new URLSearchParams({ fields: "name", access_token: token });
+  const response = await fetch(`${BASE_URL}/me?${query.toString()}`);
+  const payload = (await response.json()) as { name?: string; error?: { code?: number; message?: string } };
+  if (!response.ok || payload.error) {
+    throw new MetaApiError(payload.error?.message ?? "Token inválido ou expirado", payload.error?.code);
+  }
+  return payload.name ?? "Conta conectada";
 }
 
 export async function fetchDashboard(config: MetaConfig, range: DateRange): Promise<DashboardData> {
