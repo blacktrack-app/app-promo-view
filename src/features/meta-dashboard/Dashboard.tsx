@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   ArrowDown, ArrowUp, ArrowUpDown, DollarSign, Download, Eye, LogOut, MousePointerClick,
-  Percent, RefreshCw, Search, Settings, Smartphone, TrendingDown, TriangleAlert,
+  Percent, RefreshCw, Search, Settings, TrendingDown, TriangleAlert,
 } from "lucide-react";
 import {
   Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -18,6 +18,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import blackTrackLogo from "@/assets/blacktrack-logo.png.asset.json";
 import {
   fetchDashboard, MetaApiError, testMetaConnection,
   type CampaignMetric, type DashboardData, type MetaConfig,
@@ -162,7 +163,7 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
       <form onSubmit={submit} className="w-full max-w-sm rounded-xl border border-border bg-card p-7 shadow-2xl shadow-shadow/20 sm:p-8">
         <div className="mb-8 flex items-center gap-3">
           <BrandMark />
-          <div><p className="text-lg font-semibold">Install<span className="text-primary">Pulse</span></p><p className="text-xs text-muted-foreground">Painel de performance</p></div>
+          <div><p className="text-lg font-semibold">Black<span className="text-primary">Track</span></p><p className="text-xs text-muted-foreground">Painel de performance</p></div>
         </div>
         <h1 className="text-2xl font-semibold">Boas-vindas</h1>
         <p className="mt-2 text-sm text-muted-foreground">Entre para acessar os dados das suas campanhas.</p>
@@ -178,7 +179,7 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
 }
 
 function BrandMark() {
-  return <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground"><Smartphone className="size-5" /></div>;
+  return <img src={blackTrackLogo.url} alt="Logo BlackTrack" className="size-10 shrink-0 object-contain" />;
 }
 
 function Header(props: {
@@ -188,7 +189,7 @@ function Header(props: {
   return (
     <header className={cn("fixed inset-x-0 top-0 z-50 border-b border-border bg-background/95 backdrop-blur", props.shifted && "top-11")}>
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
-        <div className="mr-auto flex items-center gap-3"><BrandMark /><p className="hidden font-semibold sm:block">Install<span className="text-primary">Pulse</span></p></div>
+        <div className="mr-auto flex items-center gap-3"><BrandMark /><p className="hidden font-semibold sm:block">Black<span className="text-primary">Track</span></p></div>
         <nav aria-label="Período" className="order-3 flex w-full gap-1 overflow-x-auto lg:order-none lg:w-auto">
           {periods.map((item) => <Button key={item.key} size="sm" variant={props.period === item.key ? "default" : "ghost"} onClick={() => props.onPeriodChange(item.key)} className="shrink-0">{item.label}</Button>)}
         </nav>
