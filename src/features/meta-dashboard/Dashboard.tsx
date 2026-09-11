@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   ArrowDown, ArrowUp, ArrowUpDown, DollarSign, Download, Eye, LogOut, MousePointerClick,
   Percent, RefreshCw, Search, Settings, Smartphone, TrendingDown, TriangleAlert,
@@ -204,12 +204,12 @@ function Header(props: {
 }
 
 const kpiDefinitions = [
-  { key: "spend", label: "Total gasto", Icon: DollarSign, tone: "muted" },
-  { key: "downloads", label: "Downloads", Icon: Download, tone: "primary" },
-  { key: "cpi", label: "Custo por download", Icon: TrendingDown, tone: "warning" },
-  { key: "cvr", label: "Taxa de download", Icon: Percent, tone: "success" },
-  { key: "clicks", label: "Cliques no link", Icon: MousePointerClick, tone: "info" },
-  { key: "cpm", label: "CPM médio", Icon: Eye, tone: "violet" },
+  { key: "spend", label: "Total gasto", Icon: DollarSign, tone: "bg-muted text-muted-foreground" },
+  { key: "downloads", label: "Downloads", Icon: Download, tone: "bg-primary text-primary-foreground" },
+  { key: "cpi", label: "Custo por download", Icon: TrendingDown, tone: "bg-warning/15 text-warning" },
+  { key: "cvr", label: "Taxa de download", Icon: Percent, tone: "bg-success/15 text-success" },
+  { key: "clicks", label: "Cliques no link", Icon: MousePointerClick, tone: "bg-info/15 text-info" },
+  { key: "cpm", label: "CPM médio", Icon: Eye, tone: "bg-violet/15 text-violet" },
 ] as const;
 
 function KpiGrid({ data, loading }: { data: DashboardData; loading: boolean }) {
@@ -225,7 +225,7 @@ function KpiGrid({ data, loading }: { data: DashboardData; loading: boolean }) {
     <section aria-label="Indicadores" className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
       {kpiDefinitions.map(({ key, label, Icon, tone }) => (
         <article key={key} className="rounded-xl border border-border bg-card p-5 shadow-lg shadow-shadow/20 transition-colors hover:bg-card-hover">
-          <div className="flex items-start justify-between"><div className={cn("flex size-10 items-center justify-center rounded-full", `bg-${tone} text-${tone}-foreground`)}><Icon className="size-5" /></div><span className="text-[11px] font-semibold uppercase text-muted-foreground">{label}</span></div>
+          <div className="flex items-start justify-between"><div className={cn("flex size-10 items-center justify-center rounded-full", tone)}><Icon className="size-5" /></div><span className="text-[11px] font-semibold uppercase text-muted-foreground">{label}</span></div>
           {loading ? <Skeleton className="mt-6 h-9 w-36" /> : <p className="mt-5 text-3xl font-bold">{values[key]}</p>}
           {key === "clicks" && !loading && <p className="mt-1 text-xs font-medium text-primary">CTR: {percent(summary.ctr)}</p>}
         </article>
