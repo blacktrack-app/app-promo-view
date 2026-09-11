@@ -38,8 +38,8 @@ type SortState = { key: SortKey; direction: "asc" | "desc" };
 
 function getInitialConfig(): MetaConfig {
   return {
-    token: import.meta.env.VITE_FB_ACCESS_TOKEN ?? "",
-    accountId: import.meta.env.VITE_FB_ACCOUNT_ID ?? "",
+    token: import.meta.env["VITE_FB_ACCESS_TOKEN"] ?? "",
+    accountId: import.meta.env["VITE_FB_ACCOUNT_ID"] ?? "",
   };
 }
 
@@ -149,8 +149,8 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
   const [error, setError] = useState(false);
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    const expectedUser = import.meta.env.VITE_DASH_USER ?? "usuario";
-    const expectedPassword = import.meta.env.VITE_DASH_PASSWORD ?? "senha123";
+    const expectedUser = import.meta.env["VITE_DASH_USER"] ?? "usuario";
+    const expectedPassword = import.meta.env["VITE_DASH_PASSWORD"] ?? "senha123";
     if (user === expectedUser && password === expectedPassword) {
       localStorage.setItem(AUTH_KEY, "true"); onSuccess(); return;
     }
