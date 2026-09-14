@@ -9,6 +9,7 @@ import {
   Download,
   Eye,
   LogOut,
+  Play,
   RefreshCw,
   Search,
   Settings,
@@ -52,6 +53,7 @@ const emptyData: DashboardData = {
     installs: 0,
     activations: 0,
     registrations: 0,
+    startTrials: 0,
     initiatedCheckouts: 0,
     subscribes: 0,
     purchases: 0,
@@ -74,6 +76,7 @@ type SortKey =
   | "spend"
   | "installs"
   | "registrations"
+  | "startTrials"
   | "initiatedCheckouts"
   | "acquisitions"
   | "cpi"
@@ -386,6 +389,7 @@ function KpiGrid({ data, loading }: { data: DashboardData; loading: boolean }) {
   const volume = [
     { label: "Installs", value: integer.format(summary.installs), Icon: Download, tone: "bg-primary text-primary-foreground" },
     { label: "Cadastros", value: integer.format(summary.registrations), Icon: UserPlus, tone: "bg-info/15 text-info" },
+    { label: "Trials", value: integer.format(summary.startTrials), Icon: Play, tone: "bg-funnel-trial/15 text-funnel-trial" },
     { label: "Assinantes", value: integer.format(acquisitions), Icon: CreditCard, tone: "bg-success/15 text-success" },
   ];
   return (
@@ -408,7 +412,7 @@ function KpiSection({
   return (
     <section aria-label={title}>
       <h2 className="mb-3 text-xs font-semibold uppercase text-muted-foreground">{title}</h2>
-      <div className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2", items.length === 3 ? "xl:grid-cols-3" : "xl:grid-cols-4")}>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {items.map(({ label, value, Icon, tone, valueTone }) => (
           <article key={label} className="rounded-xl border border-border bg-card p-5 shadow-lg shadow-shadow/20 transition-colors hover:bg-card-hover">
             <div className="flex items-start justify-between gap-3">
@@ -429,8 +433,9 @@ function FunnelChart({ data, loading }: { data: DashboardData; loading: boolean 
     { label: "Install", value: summary.installs },
     { label: "Activate", value: summary.activations },
     { label: "Registration", value: summary.registrations },
+    { label: "StartTrial", value: summary.startTrials },
     { label: "InitiatedCheckout", value: summary.initiatedCheckouts },
-    { label: "Subscribe", value: summary.subscribes + summary.purchases },
+    { label: "Subscribe/Purchase", value: summary.subscribes + summary.purchases },
   ];
   const maxValue = steps[0]?.value || 1;
   const chartWidth = 1000;
@@ -469,14 +474,14 @@ function FunnelChart({ data, loading }: { data: DashboardData; loading: boolean 
   return (
     <section className="mt-6 rounded-xl border border-border bg-card p-5 shadow-lg shadow-shadow/20 sm:p-6">
       <h2 className="font-semibold">Funil de conversão</h2>
-      <p className="mt-1 text-xs text-muted-foreground">Install → Subscribe</p>
+       <p className="mt-1 text-xs text-muted-foreground">Install → Activate → Registration → StartTrial → InitiatedCheckout → Subscribe/Purchase</p>
       <div className="mt-5 min-h-72 overflow-x-auto">
         {loading ? <LoadingState label="Carregando funil" /> : (
           <svg
             viewBox={`0 0 ${chartWidth} 280`}
             className="h-auto min-w-[760px] w-full"
             role="img"
-            aria-label="Funil de conversão em fluxo contínuo de Install até Subscribe"
+             aria-label="Funil de conversão de Install até Subscribe ou Purchase"
           >
             <defs>
               <linearGradient id="sankey-flow-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -650,6 +655,9 @@ function ChartTooltip({
       <p className="text-muted-foreground">
         Cadastros: <span className="text-foreground">{integer.format(item.registrations)}</span>
       </p>
+       <p className="text-muted-foreground">
+         Trials: <span className="text-foreground">{integer.format(item.startTrials)}</span>
+       </p>
       <p className="text-muted-foreground">
         Assinantes: <span className="text-foreground">{integer.format(item.subscribes + item.purchases)}</span>
       </p>
@@ -722,6 +730,7 @@ function CampaignTable({ data, loading }: { data: CampaignMetric[]; loading: boo
                 ["spend", "Gasto"],
                 ["installs", "Installs"],
                 ["registrations", "Registros"],
+                 ["startTrials", "Trials"],
                 ["initiatedCheckouts", "Checkouts"],
                 ["acquisitions", "Assinantes"],
                 ["cpi", "CPI"],
@@ -757,6 +766,7 @@ function CampaignTable({ data, loading }: { data: CampaignMetric[]; loading: boo
                 <TableCell className="px-5 text-right">{currency.format(campaign.spend)}</TableCell>
                 <TableCell className="px-5 text-right">{integer.format(campaign.installs)}</TableCell>
                 <TableCell className="px-5 text-right">{integer.format(campaign.registrations)}</TableCell>
+                 <TableCell className="px-5 text-right">{integer.format(campaign.startTrials)}</TableCell>
                 <TableCell className="px-5 text-right">{integer.format(campaign.initiatedCheckouts)}</TableCell>
                 <TableCell className="px-5 text-right">{integer.format(campaign.subscribes + campaign.purchases)}</TableCell>
                 <TableCell

@@ -13,3 +13,5 @@
 - [x] Remover StartTrial de dados, indicadores, gráfico e tabela
 - [x] Redesenhar o funil como fluxo Sankey contínuo
 - [x] Validar o novo funil em desktop e celular
+- [ ] Restaurar StartTrial nos dados, indicadores, funil, gráfico e tabela
+- [ ] Validar novamente o dashboard completo em desktop e celular
