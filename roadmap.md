@@ -5,3 +5,8 @@
 - [x] Criar indicadores, gráfico e tabela de campanhas
 - [x] Implementar carregamento, vazio e erros amigáveis
 - [x] Validar desktop e celular
+- [x] Extrair novos eventos e valores da Meta
+- [x] Atualizar KPIs financeiros e de volume
+- [x] Adicionar funil e eventos de engajamento
+- [x] Atualizar gráfico temporal e tabela de campanhas
+- [x] Validar cálculos e responsividade
