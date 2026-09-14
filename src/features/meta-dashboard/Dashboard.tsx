@@ -506,11 +506,11 @@ function KpiSection({
 function FunnelChart({ data, loading }: { data: DashboardData; loading: boolean }) {
   const { summary } = data;
   const steps = [
-    { label: "Install", value: summary.installs },
-    { label: "Activate", value: summary.activations },
-    { label: "Registration", value: summary.registrations },
-    { label: "InitiatedCheckout", value: summary.initiatedCheckouts },
-    { label: "Subscribe", value: summary.subscribes + summary.purchases },
+    { label: "INSTALL", value: summary.installs },
+    { label: "ACTIVATE", value: summary.activations },
+    { label: "REGISTRATION", value: summary.registrations },
+    { label: "INITIATED CHECKOUT", value: summary.initiatedCheckouts },
+    { label: "SUBSCRIBE", value: summary.subscribes + summary.purchases },
   ];
   const maxValue = steps[0]?.value || 1;
   const chartWidth = 1000;

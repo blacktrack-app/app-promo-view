@@ -170,7 +170,7 @@ export async function fetchDashboard(config: MetaConfig, range: DateRange): Prom
       ...metrics,
       id,
       name,
-      campaignName,
+      ...(campaignName ? { campaignName } : {}),
       status,
       cpi: metrics.installs > 0 ? metrics.spend / metrics.installs : null,
       cpa: acquisitions > 0 ? metrics.spend / acquisitions : null,
