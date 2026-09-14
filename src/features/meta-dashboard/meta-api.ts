@@ -64,6 +64,7 @@ export function getActionValue(actions: Action[] | undefined, actionType: string
     actionType,
     `offsite_conversion.${actionType}`,
     actionType.replace("app_custom_event.", "offsite_conversion.fb_pixel_"),
+    actionType.replace("app_custom_event.", ""),
     shortType,
     `offsite_conversion.${shortType}`,
   ];
