@@ -7,6 +7,7 @@ type Insight = {
   campaign_id?: string;
   spend?: string;
   actions?: Action[];
+  action_values?: Action[];
   inline_link_clicks?: string;
   inline_link_click_ctr?: string;
   cpm?: string;
@@ -16,16 +17,34 @@ type Insight = {
 type CampaignStatus = { id: string; status: string };
 type MetaResponse<T> = { data?: T[]; error?: { code?: number; message?: string } };
 
-export type Summary = { spend: number; downloads: number; clicks: number; ctr: number; cpm: number };
-export type DailyMetric = { date: string; spend: number; downloads: number; cpi: number | null };
-export type CampaignMetric = {
+export type EventMetrics = {
+  spend: number;
+  installs: number;
+  activations: number;
+  registrations: number;
+  startTrials: number;
+  initiatedCheckouts: number;
+  subscribes: number;
+  purchases: number;
+  purchaseValue: number;
+  subscribeValue: number;
+  viewContent: number;
+  searches: number;
+  detectorQueries: number;
+  clicks: number;
+  ctr: number;
+  cpm: number;
+};
+
+export type Summary = EventMetrics;
+export type DailyMetric = EventMetrics & { date: string };
+export type CampaignMetric = EventMetrics & {
   id: string;
   name: string;
   status: string;
-  spend: number;
-  downloads: number;
   cpi: number | null;
-  clicks: number;
+  cpa: number | null;
+  roas: number | null;
 };
 export type DashboardData = { summary: Summary; daily: DailyMetric[]; campaigns: CampaignMetric[] };
 
@@ -37,8 +56,46 @@ export class MetaApiError extends Error {
 
 const BASE_URL = "https://graph.facebook.com/v19.0";
 const numberValue = (value?: string) => Number(value ?? 0) || 0;
-export const getDownloads = (actions?: Action[]) =>
-  numberValue(actions?.find((action) => action.action_type === "mobile_app_install")?.value);
+
+export function getActionValue(actions: Action[] | undefined, actionType: string) {
+  if (!Array.isArray(actions)) return 0;
+  const shortType = actionType.replace("app_custom_event.fb_mobile_", "");
+  const variations = [
+    actionType,
+    `offsite_conversion.${actionType}`,
+    actionType.replace("app_custom_event.", "offsite_conversion.fb_pixel_"),
+    shortType,
+    `offsite_conversion.${shortType}`,
+  ];
+  for (const variation of variations) {
+    const found = actions.find((action) => action.action_type === variation);
+    if (found) return numberValue(found.value);
+  }
+  return 0;
+}
+
+export function processInsight(data: Insight | undefined): EventMetrics {
+  const actions = data?.actions;
+  const actionValues = data?.action_values;
+  return {
+    spend: numberValue(data?.spend),
+    installs: getActionValue(actions, "mobile_app_install"),
+    activations: getActionValue(actions, "app_custom_event.fb_mobile_activate_app"),
+    registrations: getActionValue(actions, "app_custom_event.fb_mobile_complete_registration"),
+    startTrials: getActionValue(actions, "app_custom_event.fb_mobile_start_trial"),
+    initiatedCheckouts: getActionValue(actions, "app_custom_event.fb_mobile_initiated_checkout"),
+    subscribes: getActionValue(actions, "app_custom_event.fb_mobile_subscribe"),
+    purchases: getActionValue(actions, "app_custom_event.fb_mobile_purchase"),
+    purchaseValue: getActionValue(actionValues, "app_custom_event.fb_mobile_purchase"),
+    subscribeValue: getActionValue(actionValues, "app_custom_event.fb_mobile_subscribe"),
+    viewContent: getActionValue(actions, "app_custom_event.fb_mobile_content_view"),
+    searches: getActionValue(actions, "app_custom_event.fb_mobile_search"),
+    detectorQueries: getActionValue(actions, "app_custom_event.DetectorQuery"),
+    clicks: numberValue(data?.inline_link_clicks),
+    ctr: numberValue(data?.inline_link_click_ctr),
+    cpm: numberValue(data?.cpm),
+  };
+}
 
 function accountPath(accountId: string) {
   const clean = accountId.trim().replace(/^act_/, "");
@@ -56,6 +113,7 @@ async function request<T>(path: string, params: Record<string, string>, token: s
 }
 
 const timeRange = (range: DateRange) => JSON.stringify(range);
+const insightFields = "spend,actions,action_values,inline_link_clicks,inline_link_click_ctr,cpm";
 
 export async function testMetaConnection(token: string) {
   const query = new URLSearchParams({ fields: "name", access_token: token });
@@ -71,18 +129,15 @@ export async function fetchDashboard(config: MetaConfig, range: DateRange): Prom
   const account = accountPath(config.accountId);
   const rangeValue = timeRange(range);
   const [summaryRows, dailyRows, campaignRows, statusRows] = await Promise.all([
+    request<Insight>(account + "/insights", { fields: insightFields, time_range: rangeValue }, config.token),
     request<Insight>(account + "/insights", {
-      fields: "spend,actions,inline_link_clicks,inline_link_click_ctr,cpm",
-      time_range: rangeValue,
-    }, config.token),
-    request<Insight>(account + "/insights", {
-      fields: "spend,actions",
+      fields: insightFields,
       time_increment: "1",
       time_range: rangeValue,
       level: "account",
     }, config.token),
     request<Insight>(account + "/insights", {
-      fields: "campaign_name,campaign_id,spend,actions,inline_link_clicks",
+      fields: `campaign_name,campaign_id,${insightFields}`,
       level: "campaign",
       time_range: rangeValue,
       limit: "100",
@@ -90,35 +145,25 @@ export async function fetchDashboard(config: MetaConfig, range: DateRange): Prom
     request<CampaignStatus>(account + "/campaigns", { fields: "id,name,status", limit: "100" }, config.token),
   ]);
 
-  const insight = summaryRows[0];
   const statuses = new Map(statusRows.map((campaign) => [campaign.id, campaign.status]));
   const campaigns = campaignRows.map((campaign) => {
-    const spend = numberValue(campaign.spend);
-    const downloads = getDownloads(campaign.actions);
+    const metrics = processInsight(campaign);
+    const acquisitions = metrics.subscribes + metrics.purchases;
+    const revenue = metrics.purchaseValue + metrics.subscribeValue;
     return {
+      ...metrics,
       id: campaign.campaign_id ?? campaign.campaign_name ?? crypto.randomUUID(),
       name: campaign.campaign_name ?? "Campanha sem nome",
       status: statuses.get(campaign.campaign_id ?? "") ?? "UNKNOWN",
-      spend,
-      downloads,
-      cpi: downloads > 0 ? spend / downloads : null,
-      clicks: numberValue(campaign.inline_link_clicks),
+      cpi: metrics.installs > 0 ? metrics.spend / metrics.installs : null,
+      cpa: acquisitions > 0 ? metrics.spend / acquisitions : null,
+      roas: metrics.spend > 0 ? revenue / metrics.spend : null,
     };
   });
 
   return {
-    summary: {
-      spend: numberValue(insight?.spend),
-      downloads: getDownloads(insight?.actions),
-      clicks: numberValue(insight?.inline_link_clicks),
-      ctr: numberValue(insight?.inline_link_click_ctr),
-      cpm: numberValue(insight?.cpm),
-    },
-    daily: dailyRows.map((day) => {
-      const spend = numberValue(day.spend);
-      const downloads = getDownloads(day.actions);
-      return { date: day.date_start ?? "", spend, downloads, cpi: downloads > 0 ? spend / downloads : null };
-    }),
+    summary: processInsight(summaryRows[0]),
+    daily: dailyRows.map((day) => ({ ...processInsight(day), date: day.date_start ?? "" })),
     campaigns,
   };
 }
