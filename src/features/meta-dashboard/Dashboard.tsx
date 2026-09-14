@@ -9,7 +9,6 @@ import {
   Download,
   Eye,
   LogOut,
-  Play,
   RefreshCw,
   Search,
   Settings,
@@ -53,7 +52,6 @@ const emptyData: DashboardData = {
     installs: 0,
     activations: 0,
     registrations: 0,
-    startTrials: 0,
     initiatedCheckouts: 0,
     subscribes: 0,
     purchases: 0,
@@ -76,7 +74,6 @@ type SortKey =
   | "spend"
   | "installs"
   | "registrations"
-  | "startTrials"
   | "initiatedCheckouts"
   | "acquisitions"
   | "cpi"
@@ -389,7 +386,6 @@ function KpiGrid({ data, loading }: { data: DashboardData; loading: boolean }) {
   const volume = [
     { label: "Installs", value: integer.format(summary.installs), Icon: Download, tone: "bg-primary text-primary-foreground" },
     { label: "Cadastros", value: integer.format(summary.registrations), Icon: UserPlus, tone: "bg-info/15 text-info" },
-    { label: "Trials", value: integer.format(summary.startTrials), Icon: Play, tone: "bg-violet/15 text-violet" },
     { label: "Assinantes", value: integer.format(acquisitions), Icon: CreditCard, tone: "bg-success/15 text-success" },
   ];
   return (
@@ -412,7 +408,7 @@ function KpiSection({
   return (
     <section aria-label={title}>
       <h2 className="mb-3 text-xs font-semibold uppercase text-muted-foreground">{title}</h2>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2", items.length === 3 ? "xl:grid-cols-3" : "xl:grid-cols-4")}>
         {items.map(({ label, value, Icon, tone, valueTone }) => (
           <article key={label} className="rounded-xl border border-border bg-card p-5 shadow-lg shadow-shadow/20 transition-colors hover:bg-card-hover">
             <div className="flex items-start justify-between gap-3">
@@ -430,38 +426,82 @@ function KpiSection({
 function FunnelChart({ data, loading }: { data: DashboardData; loading: boolean }) {
   const { summary } = data;
   const steps = [
-    { label: "Install", value: summary.installs, color: "var(--primary)" },
-    { label: "Activate", value: summary.activations, color: "var(--funnel-activate)" },
-    { label: "Registration", value: summary.registrations, color: "var(--warning)" },
-    { label: "StartTrial", value: summary.startTrials, color: "var(--violet)" },
-    { label: "InitCheckout", value: summary.initiatedCheckouts, color: "var(--info)" },
-    { label: "Subscribe", value: summary.subscribes + summary.purchases, color: "var(--success)" },
+    { label: "Install", value: summary.installs },
+    { label: "Activate", value: summary.activations },
+    { label: "Registration", value: summary.registrations },
+    { label: "InitiatedCheckout", value: summary.initiatedCheckouts },
+    { label: "Subscribe", value: summary.subscribes + summary.purchases },
   ];
   const maxValue = steps[0]?.value || 1;
+  const chartWidth = 1000;
+  const centerY = 142;
+  const maxHalfHeight = 68;
+  const minHalfHeight = 5;
+  const firstX = 100;
+  const lastX = 900;
+  const stepGap = (lastX - firstX) / Math.max(steps.length - 1, 1);
+  const points = steps.map((step, index) => {
+    const ratio = Math.max(0, step.value / maxValue);
+    const halfHeight = Math.max(ratio * maxHalfHeight, minHalfHeight);
+    return {
+      ...step,
+      ratio,
+      x: firstX + index * stepGap,
+      top: centerY - halfHeight,
+      bottom: centerY + halfHeight,
+    };
+  });
+  const topPath = points.reduce((path, point, index) => {
+    if (index === 0) return `M 28 ${point.top} L ${point.x} ${point.top}`;
+    const previous = points[index - 1];
+    const controlX = (previous.x + point.x) / 2;
+    return `${path} C ${controlX} ${previous.top}, ${controlX} ${point.top}, ${point.x} ${point.top}`;
+  }, "");
+  const bottomPath = [...points].reverse().reduce((path, point, reverseIndex) => {
+    if (reverseIndex === 0) return `L 972 ${point.bottom} L ${point.x} ${point.bottom}`;
+    const previous = points[points.length - reverseIndex];
+    const controlX = (previous.x + point.x) / 2;
+    return `${path} C ${controlX} ${previous.bottom}, ${controlX} ${point.bottom}, ${point.x} ${point.bottom}`;
+  }, "");
+  const flowPath = `${topPath} L 972 ${points[points.length - 1]?.top ?? centerY} ${bottomPath} L 28 ${points[0]?.bottom ?? centerY} Z`;
   return (
     <section className="mt-6 rounded-xl border border-border bg-card p-5 shadow-lg shadow-shadow/20 sm:p-6">
       <h2 className="font-semibold">Funil de conversão</h2>
       <p className="mt-1 text-xs text-muted-foreground">Install → Subscribe</p>
-      <div className="mt-7 min-h-60 overflow-x-auto">
+      <div className="mt-5 min-h-72 overflow-x-auto">
         {loading ? <LoadingState label="Carregando funil" /> : (
-          <div className="flex min-w-[720px] items-end">
-            {steps.map((step, index) => {
-              const width = Math.max((step.value / maxValue) * 100, 5);
-              const nextValue = steps[index + 1]?.value ?? step.value;
-              const nextWidth = Math.max((nextValue / maxValue) * 100, 5);
-              const rate = (step.value / maxValue) * 100;
-              return (
-                <div key={step.label} className="flex min-w-28 flex-1 flex-col items-center">
-                  <span className="mb-2 min-h-8 text-center text-[11px] font-semibold uppercase text-muted-foreground">{step.label}</span>
-                  <svg viewBox="0 0 100 112" className="h-28 w-full" preserveAspectRatio="none" aria-hidden="true">
-                    <polygon points={`${50 - width / 2},0 ${50 + width / 2},0 ${50 + nextWidth / 2},112 ${50 - nextWidth / 2},112`} fill={step.color} opacity="0.82" />
-                  </svg>
-                  <span className="mt-3 text-sm font-bold text-primary">{percent(rate)}</span>
-                  <span className="mt-1 text-base font-semibold">{integer.format(step.value)}</span>
-                </div>
-              );
-            })}
-          </div>
+          <svg
+            viewBox={`0 0 ${chartWidth} 280`}
+            className="h-auto min-w-[760px] w-full"
+            role="img"
+            aria-label="Funil de conversão em fluxo contínuo de Install até Subscribe"
+          >
+            <defs>
+              <linearGradient id="sankey-flow-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.9" />
+                <stop offset="36%" stopColor="var(--warning)" stopOpacity="0.86" />
+                <stop offset="72%" stopColor="var(--success)" stopOpacity="0.78" />
+                <stop offset="100%" stopColor="var(--info)" stopOpacity="0.88" />
+              </linearGradient>
+            </defs>
+            {points.slice(1).map((point) => (
+              <line key={point.label} x1={point.x} x2={point.x} y1="52" y2="230" stroke="var(--border)" strokeWidth="1" />
+            ))}
+            <path d={flowPath} fill="url(#sankey-flow-gradient)" />
+            {points.map((point) => (
+              <g key={point.label}>
+                <text x={point.x} y="24" textAnchor="middle" fill="var(--muted-foreground)" fontSize="12" fontWeight="600">
+                  {point.label}
+                </text>
+                <text x={point.x} y={centerY + 4} textAnchor="middle" fill="var(--primary-foreground)" fontSize="14" fontWeight="700">
+                  {percent(point.ratio * 100)}
+                </text>
+                <text x={point.x} y="258" textAnchor="middle" fill="var(--foreground)" fontSize="15" fontWeight="700">
+                  {integer.format(point.value)}
+                </text>
+              </g>
+            ))}
+          </svg>
         )}
       </div>
     </section>
@@ -609,9 +649,6 @@ function ChartTooltip({
         Cadastros: <span className="text-foreground">{integer.format(item.registrations)}</span>
       </p>
       <p className="text-muted-foreground">
-        Trials: <span className="text-foreground">{integer.format(item.startTrials)}</span>
-      </p>
-      <p className="text-muted-foreground">
         Assinantes: <span className="text-foreground">{integer.format(item.subscribes + item.purchases)}</span>
       </p>
       <p className="text-muted-foreground">
@@ -683,7 +720,6 @@ function CampaignTable({ data, loading }: { data: CampaignMetric[]; loading: boo
                 ["spend", "Gasto"],
                 ["installs", "Installs"],
                 ["registrations", "Registros"],
-                ["startTrials", "Trials"],
                 ["initiatedCheckouts", "Checkouts"],
                 ["acquisitions", "Assinantes"],
                 ["cpi", "CPI"],
@@ -719,7 +755,6 @@ function CampaignTable({ data, loading }: { data: CampaignMetric[]; loading: boo
                 <TableCell className="px-5 text-right">{currency.format(campaign.spend)}</TableCell>
                 <TableCell className="px-5 text-right">{integer.format(campaign.installs)}</TableCell>
                 <TableCell className="px-5 text-right">{integer.format(campaign.registrations)}</TableCell>
-                <TableCell className="px-5 text-right">{integer.format(campaign.startTrials)}</TableCell>
                 <TableCell className="px-5 text-right">{integer.format(campaign.initiatedCheckouts)}</TableCell>
                 <TableCell className="px-5 text-right">{integer.format(campaign.subscribes + campaign.purchases)}</TableCell>
                 <TableCell
