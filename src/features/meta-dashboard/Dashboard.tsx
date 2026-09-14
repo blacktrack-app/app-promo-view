@@ -4,26 +4,31 @@ import {
   ArrowUp,
   ArrowUpDown,
   BarChart3,
+  CalendarDays,
   CreditCard,
   DollarSign,
   Download,
   Eye,
   LogOut,
-  Play,
   RefreshCw,
   Search,
   Settings,
+  Target,
   TrendingDown,
   TriangleAlert,
   UserPlus,
   Zap,
 } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import type { DateRange as SelectedDateRange } from "react-day-picker";
 import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
   DialogContent,
@@ -34,14 +39,16 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 import blackTrackLogo from "@/assets/blacktrack-logo.png.asset.json";
 import {
   fetchDashboard,
   MetaApiError,
   testMetaConnection,
-  type CampaignMetric,
+  type DateRange,
   type DashboardData,
   type MetaConfig,
+  type PerformanceMetric,
 } from "./meta-api";
 import { currency, getDateRange, integer, percent, periods, shortDate, type PeriodKey } from "./utils";
 
@@ -53,7 +60,6 @@ const emptyData: DashboardData = {
     installs: 0,
     activations: 0,
     registrations: 0,
-    startTrials: 0,
     initiatedCheckouts: 0,
     subscribes: 0,
     purchases: 0,
@@ -68,6 +74,7 @@ const emptyData: DashboardData = {
   },
   daily: [],
   campaigns: [],
+  ads: [],
 };
 
 type SortKey =
@@ -76,8 +83,7 @@ type SortKey =
   | "spend"
   | "installs"
   | "registrations"
-  | "startTrials"
-  | "initiatedCheckouts"
+  | "campaignName"
   | "acquisitions"
   | "cpi"
   | "cpa"
@@ -96,6 +102,7 @@ export function Dashboard() {
   const [authenticated, setAuthenticated] = useState(false);
   const [config, setConfig] = useState<MetaConfig>(getInitialConfig);
   const [period, setPeriod] = useState<PeriodKey>("7days");
+  const [customRange, setCustomRange] = useState<DateRange | null>(null);
   const [data, setData] = useState<DashboardData>(emptyData);
   const [loading, setLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -117,7 +124,12 @@ export function Dashboard() {
     setReady(true);
   }, []);
 
-  async function loadData(force = false, nextConfig = config, nextPeriod = period) {
+  async function loadData(
+    force = false,
+    nextConfig = config,
+    nextPeriod = period,
+    nextCustomRange = customRange,
+  ) {
     if (!nextConfig.token || !nextConfig.accountId || (tokenExpired && !force)) {
       if (!nextConfig.token || !nextConfig.accountId) setSettingsOpen(true);
       return;
@@ -125,7 +137,8 @@ export function Dashboard() {
     setLoading(true);
     setGeneralError(false);
     try {
-      const result = await fetchDashboard(nextConfig, getDateRange(nextPeriod));
+      const range = nextPeriod === "custom" && nextCustomRange ? nextCustomRange : getDateRange(nextPeriod);
+      const result = await fetchDashboard(nextConfig, range);
       setData(result);
       setHasLoaded(true);
       setTokenExpired(false);
@@ -152,8 +165,14 @@ export function Dashboard() {
   if (!authenticated) return <LoginScreen onSuccess={() => setAuthenticated(true)} />;
 
   const selectPeriod = (nextPeriod: PeriodKey) => {
+    if (nextPeriod === "custom") return;
     setPeriod(nextPeriod);
     void loadData(false, config, nextPeriod);
+  };
+  const applyCustomRange = (range: DateRange) => {
+    setCustomRange(range);
+    setPeriod("custom");
+    void loadData(false, config, "custom", range);
   };
   const logout = () => {
     localStorage.removeItem(AUTH_KEY);
@@ -178,6 +197,8 @@ export function Dashboard() {
       <Header
         period={period}
         onPeriodChange={selectPeriod}
+        customRange={customRange}
+        onCustomRangeApply={applyCustomRange}
         loading={loading}
         lastUpdated={lastUpdated}
         onRefresh={() => void loadData(true)}
@@ -205,7 +226,7 @@ export function Dashboard() {
         <FunnelChart data={data} loading={loading && !hasLoaded} />
         <EngagementMetrics data={data} loading={loading && !hasLoaded} />
         <PerformanceChart data={data} loading={loading && !hasLoaded} />
-        <CampaignTable data={data.campaigns} loading={loading && !hasLoaded} />
+        <PerformanceTable campaigns={data.campaigns} ads={data.ads} loading={loading && !hasLoaded} />
       </main>
       <SettingsDialog
         open={settingsOpen}
@@ -304,6 +325,8 @@ function BrandMark() {
 function Header(props: {
   period: PeriodKey;
   onPeriodChange: (value: PeriodKey) => void;
+  customRange: DateRange | null;
+  onCustomRangeApply: (range: DateRange) => void;
   loading: boolean;
   lastUpdated: Date | null;
   onRefresh: () => void;
@@ -311,7 +334,26 @@ function Header(props: {
   onLogout: () => void;
   shifted: boolean;
 }) {
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [draftRange, setDraftRange] = useState<SelectedDateRange | undefined>();
+  const isMobile = useIsMobile();
+  const customLabel = props.period === "custom" && props.customRange
+    ? `${format(new Date(`${props.customRange.since}T12:00:00`), "dd/MM")} - ${format(new Date(`${props.customRange.until}T12:00:00`), "dd/MM")}`
+    : "Personalizado";
+  const openCalendar = () => {
+    setDraftRange(props.customRange ? {
+      from: new Date(`${props.customRange.since}T12:00:00`),
+      to: new Date(`${props.customRange.until}T12:00:00`),
+    } : undefined);
+    setCalendarOpen(true);
+  };
+  const applyRange = () => {
+    if (!draftRange?.from || !draftRange.to) return;
+    props.onCustomRangeApply({ since: format(draftRange.from, "yyyy-MM-dd"), until: format(draftRange.to, "yyyy-MM-dd") });
+    setCalendarOpen(false);
+  };
   return (
+    <>
     <header
       className={cn(
         "fixed inset-x-0 top-0 z-50 border-b border-border bg-background/95 backdrop-blur",
@@ -331,10 +373,10 @@ function Header(props: {
               key={item.key}
               size="sm"
               variant={props.period === item.key ? "default" : "ghost"}
-              onClick={() => props.onPeriodChange(item.key)}
+              onClick={() => item.key === "custom" ? openCalendar() : props.onPeriodChange(item.key)}
               className="shrink-0"
             >
-              {item.label}
+              {item.key === "custom" ? <><CalendarDays />{customLabel}</> : item.label}
             </Button>
           ))}
         </nav>
@@ -365,6 +407,37 @@ function Header(props: {
         </div>
       </div>
     </header>
+    <Dialog open={calendarOpen} onOpenChange={setCalendarOpen}>
+      <DialogContent className="w-auto max-w-[calc(100vw-2rem)] rounded-lg border-border bg-card p-0 sm:max-w-none">
+        <DialogHeader className="px-5 pt-5">
+          <DialogTitle>Período personalizado</DialogTitle>
+          <DialogDescription>Selecione a data inicial e a data final.</DialogDescription>
+        </DialogHeader>
+        <Calendar
+          mode="range"
+          locale={ptBR}
+          selected={draftRange}
+          onSelect={setDraftRange}
+          numberOfMonths={isMobile ? 1 : 2}
+          disabled={{ after: new Date() }}
+          className="pointer-events-auto bg-card px-4"
+          classNames={{
+            range_start: "bg-primary/20 rounded-l-md",
+            range_middle: "bg-primary/20 rounded-none",
+            range_end: "bg-primary/20 rounded-r-md",
+            today: "rounded-md border border-primary bg-transparent text-foreground",
+          }}
+        />
+        <DialogFooter className="flex-row justify-between border-t border-border px-5 py-4 sm:justify-between">
+          <Button variant="ghost" onClick={() => setDraftRange(undefined)}>Limpar</Button>
+          <div className="ml-auto flex gap-2">
+            <Button variant="outline" onClick={() => setCalendarOpen(false)}>Cancelar</Button>
+            <Button onClick={applyRange} disabled={!draftRange?.from || !draftRange.to}>Aplicar</Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
@@ -373,11 +446,17 @@ function KpiGrid({ data, loading }: { data: DashboardData; loading: boolean }) {
   const revenue = summary.purchaseValue + summary.subscribeValue;
   const acquisitions = summary.subscribes + summary.purchases;
   const cpa = acquisitions > 0 ? summary.spend / acquisitions : null;
+  const cpi = summary.installs > 0 ? summary.spend / summary.installs : null;
   const roas = summary.spend > 0 ? revenue / summary.spend : null;
-  const financial = [
+  const featured = [
     { label: "Investimento", value: currency.format(summary.spend), Icon: DollarSign, tone: "bg-muted text-muted-foreground" },
+    { label: "Instalações", value: integer.format(summary.installs), Icon: Download, tone: "bg-primary text-primary-foreground" },
+    { label: "Custo por Instalação (CPI)", value: cpi === null ? "—" : currency.format(cpi), Icon: TrendingDown, tone: "bg-warning/15 text-warning" },
+  ];
+  const compact = [
     { label: "Faturamento", value: currency.format(revenue), Icon: DollarSign, tone: "bg-success/15 text-success" },
-    { label: "CPA", value: cpa === null ? "—" : currency.format(cpa), Icon: TrendingDown, tone: "bg-warning/15 text-warning" },
+    { label: "Cadastros", value: integer.format(summary.registrations), Icon: UserPlus, tone: "bg-info/15 text-info" },
+    { label: "Assinantes", value: integer.format(acquisitions), Icon: CreditCard, tone: "bg-success/15 text-success" },
     {
       label: "ROAS",
       value: roas === null ? "—" : `${roas.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}x`,
@@ -385,17 +464,12 @@ function KpiGrid({ data, loading }: { data: DashboardData; loading: boolean }) {
       tone: "bg-primary text-primary-foreground",
       valueTone: roas === null ? "" : roas >= 1 ? "text-success" : "text-destructive",
     },
-  ];
-  const volume = [
-    { label: "Installs", value: integer.format(summary.installs), Icon: Download, tone: "bg-primary text-primary-foreground" },
-    { label: "Cadastros", value: integer.format(summary.registrations), Icon: UserPlus, tone: "bg-info/15 text-info" },
-    { label: "Trials", value: integer.format(summary.startTrials), Icon: Play, tone: "bg-violet/15 text-violet" },
-    { label: "Assinantes", value: integer.format(acquisitions), Icon: CreditCard, tone: "bg-success/15 text-success" },
+    { label: "CPA", value: cpa === null ? "—" : currency.format(cpa), Icon: Target, tone: "bg-violet/15 text-violet" },
   ];
   return (
     <div className="space-y-6">
-      <KpiSection title="KPIs financeiros" items={financial} loading={loading} />
-      <KpiSection title="KPIs de volume" items={volume} loading={loading} />
+      <KpiSection title="Principais indicadores" items={featured} loading={loading} featured />
+      <KpiSection title="Resultados" items={compact} loading={loading} />
     </div>
   );
 }
@@ -404,22 +478,24 @@ function KpiSection({
   title,
   items,
   loading,
+  featured = false,
 }: {
   title: string;
   items: Array<{ label: string; value: string; Icon: typeof DollarSign; tone: string; valueTone?: string }>;
   loading: boolean;
+  featured?: boolean;
 }) {
   return (
     <section aria-label={title}>
       <h2 className="mb-3 text-xs font-semibold uppercase text-muted-foreground">{title}</h2>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2", featured ? "lg:grid-cols-3" : "xl:grid-cols-5")}>
         {items.map(({ label, value, Icon, tone, valueTone }) => (
-          <article key={label} className="rounded-xl border border-border bg-card p-5 shadow-lg shadow-shadow/20 transition-colors hover:bg-card-hover">
+          <article key={label} className={cn("rounded-lg border border-border bg-card shadow-lg shadow-shadow/20 transition-colors hover:bg-card-hover", featured ? "min-h-44 p-7" : "min-h-36 p-5")}>
             <div className="flex items-start justify-between gap-3">
               <div className={cn("flex size-10 shrink-0 items-center justify-center rounded-full", tone)}><Icon className="size-5" /></div>
               <span className="text-right text-[11px] font-semibold uppercase text-muted-foreground">{label}</span>
             </div>
-            {loading ? <Skeleton className="mt-6 h-9 w-36" /> : <p className={cn("mt-5 text-3xl font-bold", valueTone)}>{value}</p>}
+            {loading ? <Skeleton className="mt-6 h-9 w-36" /> : <p className={cn("mt-5 font-bold", featured ? "text-4xl" : "text-2xl", valueTone)}>{value}</p>}
           </article>
         ))}
       </div>
@@ -433,9 +509,8 @@ function FunnelChart({ data, loading }: { data: DashboardData; loading: boolean 
     { label: "Install", value: summary.installs },
     { label: "Activate", value: summary.activations },
     { label: "Registration", value: summary.registrations },
-    { label: "StartTrial", value: summary.startTrials },
     { label: "InitiatedCheckout", value: summary.initiatedCheckouts },
-    { label: "Subscribe/Purchase", value: summary.subscribes + summary.purchases },
+    { label: "Subscribe", value: summary.subscribes + summary.purchases },
   ];
   const maxValue = steps[0]?.value || 1;
   const chartWidth = 1000;
@@ -474,33 +549,34 @@ function FunnelChart({ data, loading }: { data: DashboardData; loading: boolean 
   return (
     <section className="mt-6 rounded-xl border border-border bg-card p-5 shadow-lg shadow-shadow/20 sm:p-6">
       <h2 className="font-semibold">Funil de conversão</h2>
-       <p className="mt-1 text-xs text-muted-foreground">Install → Activate → Registration → StartTrial → InitiatedCheckout → Subscribe/Purchase</p>
+       <p className="mt-1 text-xs text-muted-foreground">Install → Activate → Registration → InitiatedCheckout → Subscribe</p>
       <div className="mt-5 min-h-72 overflow-x-auto">
         {loading ? <LoadingState label="Carregando funil" /> : (
           <svg
             viewBox={`0 0 ${chartWidth} 280`}
             className="h-auto min-w-[760px] w-full"
             role="img"
-             aria-label="Funil de conversão de Install até Subscribe ou Purchase"
+             aria-label="Funil de conversão de Install até Subscribe"
           >
             <defs>
-              <linearGradient id="sankey-flow-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.9" />
-                <stop offset="36%" stopColor="var(--warning)" stopOpacity="0.86" />
-                <stop offset="72%" stopColor="var(--success)" stopOpacity="0.78" />
-                <stop offset="100%" stopColor="var(--chart-2)" stopOpacity="0.88" />
+              <linearGradient id="funnelGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                 <stop offset="0%" stopColor="var(--funnel-gold)" stopOpacity="0.9" />
+                 <stop offset="25%" stopColor="var(--funnel-bronze)" stopOpacity="0.8" />
+                 <stop offset="50%" stopColor="var(--funnel-orange)" stopOpacity="0.7" />
+                 <stop offset="75%" stopColor="var(--funnel-mint)" stopOpacity="0.7" />
+                 <stop offset="100%" stopColor="var(--funnel-green)" stopOpacity="0.8" />
               </linearGradient>
             </defs>
             {points.slice(1).map((point) => (
               <line key={point.label} x1={point.x} x2={point.x} y1="52" y2="230" stroke="var(--border)" strokeWidth="1" />
             ))}
-            <path d={flowPath} fill="url(#sankey-flow-gradient)" />
+            <path d={flowPath} fill="url(#funnelGradient)" />
             {points.map((point) => (
               <g key={point.label}>
                 <text x={point.x} y="24" textAnchor="middle" fill="var(--muted-foreground)" fontSize="12" fontWeight="600">
                   {point.label}
                 </text>
-                <text x={point.x} y={centerY + 4} textAnchor="middle" fill="var(--primary-foreground)" fontSize="14" fontWeight="700">
+                <text x={point.x} y={centerY + 4} textAnchor="middle" fill="var(--primary)" fontSize="14" fontWeight="700">
                   {(point.ratio * 100).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
                 </text>
                 <text x={point.x} y="258" textAnchor="middle" fill="var(--foreground)" fontSize="15" fontWeight="700">
@@ -655,9 +731,6 @@ function ChartTooltip({
       <p className="text-muted-foreground">
         Cadastros: <span className="text-foreground">{integer.format(item.registrations)}</span>
       </p>
-       <p className="text-muted-foreground">
-         Trials: <span className="text-foreground">{integer.format(item.startTrials)}</span>
-       </p>
       <p className="text-muted-foreground">
         Assinantes: <span className="text-foreground">{integer.format(item.subscribes + item.purchases)}</span>
       </p>
@@ -668,9 +741,12 @@ function ChartTooltip({
   );
 }
 
-function CampaignTable({ data, loading }: { data: CampaignMetric[]; loading: boolean }) {
+function PerformanceTable({ campaigns, ads, loading }: { campaigns: PerformanceMetric[]; ads: PerformanceMetric[]; loading: boolean }) {
+  const [mode, setMode] = useState<"campaign" | "ad">("campaign");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortState>({ key: "spend", direction: "desc" });
+  const [page, setPage] = useState(1);
+  const data = mode === "campaign" ? campaigns : ads;
   const averageCpi = useMemo(() => {
     const withCpi = data.filter((campaign) => campaign.cpi !== null);
     return withCpi.length ? withCpi.reduce((sum, campaign) => sum + (campaign.cpi ?? 0), 0) / withCpi.length : 0;
@@ -678,9 +754,9 @@ function CampaignTable({ data, loading }: { data: CampaignMetric[]; loading: boo
   const rows = useMemo(
     () =>
       data
-        .filter((campaign) => campaign.name.toLocaleLowerCase("pt-BR").includes(search.toLocaleLowerCase("pt-BR")))
+         .filter((item) => item.name.toLocaleLowerCase("pt-BR").includes(search.toLocaleLowerCase("pt-BR")))
         .sort((a, b) => {
-          const value = (campaign: CampaignMetric) => sort.key === "acquisitions" ? campaign.subscribes + campaign.purchases : campaign[sort.key];
+           const value = (item: PerformanceMetric) => sort.key === "acquisitions" ? item.subscribes + item.purchases : item[sort.key];
           const first = value(a) ?? -1;
           const second = value(b) ?? -1;
           const result =
@@ -689,6 +765,9 @@ function CampaignTable({ data, loading }: { data: CampaignMetric[]; loading: boo
         }),
     [data, search, sort],
   );
+  const totalPages = mode === "ad" ? Math.max(1, Math.ceil(rows.length / 50)) : 1;
+  const visibleRows = mode === "ad" ? rows.slice((page - 1) * 50, page * 50) : rows;
+  useEffect(() => setPage(1), [mode, search, sort]);
   const changeSort = (key: SortKey) =>
     setSort((current) =>
       current.key === key
@@ -697,41 +776,46 @@ function CampaignTable({ data, loading }: { data: CampaignMetric[]; loading: boo
     );
   return (
     <section className="mt-6 rounded-xl border border-border bg-card shadow-lg shadow-shadow/20">
-      <div className="flex flex-col gap-4 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+      <div className="flex flex-col gap-4 border-b border-border p-5 sm:p-6">
+        <div className="flex w-fit gap-1 rounded-lg bg-background p-1" role="tablist" aria-label="Visualização da tabela">
+          <Button role="tab" aria-selected={mode === "campaign"} size="sm" variant={mode === "campaign" ? "default" : "ghost"} onClick={() => { setMode("campaign"); setSearch(""); }}>Por Campanha</Button>
+          <Button role="tab" aria-selected={mode === "ad"} size="sm" variant={mode === "ad" ? "default" : "ghost"} onClick={() => { setMode("ad"); setSearch(""); }}>Por Anúncio</Button>
+        </div>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="font-semibold">Campanhas</h2>
-          <p className="mt-1 text-xs text-muted-foreground">Resultados detalhados por campanha</p>
+          <h2 className="font-semibold">{mode === "campaign" ? "Campanhas" : "Anúncios"}</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Resultados detalhados por {mode === "campaign" ? "campanha" : "anúncio"}</p>
         </div>
         <div className="relative w-full sm:w-72">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar campanha"
+            placeholder={mode === "campaign" ? "Buscar campanha" : "Buscar anúncio"}
             className="pl-9"
           />
+        </div>
         </div>
       </div>
       {loading ? (
         <div className="h-56">
-          <LoadingState label="Carregando campanhas" />
+           <LoadingState label={mode === "campaign" ? "Carregando campanhas" : "Carregando anúncios"} />
         </div>
       ) : rows.length === 0 ? (
         <div className="h-48">
-          <EmptyState text={search ? "Nenhuma campanha corresponde à busca" : "Nenhuma campanha encontrada"} />
+           <EmptyState text={search ? `Nenhum ${mode === "campaign" ? "resultado" : "anúncio"} corresponde à busca` : `Nenhum ${mode === "campaign" ? "resultado" : "anúncio"} encontrado`} />
         </div>
       ) : (
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               {[
-                ["name", "Campanha"],
+                ["name", mode === "campaign" ? "Campanha" : "Anúncio"],
+                ...(mode === "ad" ? [["campaignName", "Campanha"]] : []),
                 ["status", "Status"],
                 ["spend", "Gasto"],
                 ["installs", "Installs"],
                 ["registrations", "Registros"],
-                 ["startTrials", "Trials"],
-                ["initiatedCheckouts", "Checkouts"],
                 ["acquisitions", "Assinantes"],
                 ["cpi", "CPI"],
                 ["cpa", "CPA"],
@@ -752,22 +836,22 @@ function CampaignTable({ data, loading }: { data: CampaignMetric[]; loading: boo
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((campaign) => (
+             {visibleRows.map((campaign) => (
               <TableRow
                 key={campaign.id}
                 className={cn(
-                  campaign.installs === 0 && campaign.spend > 0 && "bg-destructive/5 hover:bg-destructive/10",
+                   campaign.roas !== null && campaign.roas < 1 && "bg-destructive/5 hover:bg-destructive/10",
+                   campaign.roas !== null && campaign.roas > 3 && "bg-success/5 hover:bg-success/10",
                 )}
               >
                 <TableCell className="min-w-64 px-5 py-4 font-medium">{campaign.name}</TableCell>
+                {mode === "ad" && <TableCell className="min-w-52 px-5 text-muted-foreground">{campaign.campaignName ?? "—"}</TableCell>}
                 <TableCell className="px-5">
                   <StatusBadge status={campaign.status} />
                 </TableCell>
                 <TableCell className="px-5 text-right">{currency.format(campaign.spend)}</TableCell>
                 <TableCell className="px-5 text-right">{integer.format(campaign.installs)}</TableCell>
                 <TableCell className="px-5 text-right">{integer.format(campaign.registrations)}</TableCell>
-                 <TableCell className="px-5 text-right">{integer.format(campaign.startTrials)}</TableCell>
-                <TableCell className="px-5 text-right">{integer.format(campaign.initiatedCheckouts)}</TableCell>
                 <TableCell className="px-5 text-right">{integer.format(campaign.subscribes + campaign.purchases)}</TableCell>
                 <TableCell
                   className={cn(
@@ -788,6 +872,13 @@ function CampaignTable({ data, loading }: { data: CampaignMetric[]; loading: boo
             ))}
           </TableBody>
         </Table>
+      )}
+      {mode === "ad" && rows.length > 50 && (
+        <div className="flex items-center justify-end gap-3 border-t border-border px-5 py-4">
+          <span className="text-xs text-muted-foreground">Página {page} de {totalPages}</span>
+          <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Anterior</Button>
+          <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>Próximo</Button>
+        </div>
       )}
     </section>
   );
