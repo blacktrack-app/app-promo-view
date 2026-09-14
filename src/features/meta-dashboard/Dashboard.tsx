@@ -223,8 +223,8 @@ export function Dashboard() {
           </div>
         )}
         <KpiGrid data={data} loading={loading && !hasLoaded} />
-        <FunnelChart data={data} loading={loading && !hasLoaded} />
         <EngagementMetrics data={data} loading={loading && !hasLoaded} />
+        <FunnelChart data={data} loading={loading && !hasLoaded} />
         <PerformanceChart data={data} loading={loading && !hasLoaded} />
         <PerformanceTable campaigns={data.campaigns} ads={data.ads} loading={loading && !hasLoaded} />
       </main>
