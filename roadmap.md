@@ -10,3 +10,6 @@
 - [x] Adicionar funil e eventos de engajamento
 - [x] Atualizar gráfico temporal e tabela de campanhas
 - [x] Validar cálculos e responsividade
+- [x] Remover StartTrial de dados, indicadores, gráfico e tabela
+- [x] Redesenhar o funil como fluxo Sankey contínuo
+- [x] Validar o novo funil em desktop e celular

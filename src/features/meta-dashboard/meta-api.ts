@@ -22,7 +22,6 @@ export type EventMetrics = {
   installs: number;
   activations: number;
   registrations: number;
-  startTrials: number;
   initiatedCheckouts: number;
   subscribes: number;
   purchases: number;
@@ -83,7 +82,6 @@ export function processInsight(data: Insight | undefined): EventMetrics {
     installs: getActionValue(actions, "mobile_app_install"),
     activations: getActionValue(actions, "app_custom_event.fb_mobile_activate_app"),
     registrations: getActionValue(actions, "app_custom_event.fb_mobile_complete_registration"),
-    startTrials: getActionValue(actions, "app_custom_event.fb_mobile_start_trial"),
     initiatedCheckouts: getActionValue(actions, "app_custom_event.fb_mobile_initiated_checkout"),
     subscribes: getActionValue(actions, "app_custom_event.fb_mobile_subscribe"),
     purchases: getActionValue(actions, "app_custom_event.fb_mobile_purchase"),
