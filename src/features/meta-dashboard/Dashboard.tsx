@@ -454,12 +454,14 @@ function FunnelChart({ data, loading }: { data: DashboardData; loading: boolean 
   const topPath = points.reduce((path, point, index) => {
     if (index === 0) return `M 28 ${point.top} L ${point.x} ${point.top}`;
     const previous = points[index - 1];
+    if (!previous) return path;
     const controlX = (previous.x + point.x) / 2;
     return `${path} C ${controlX} ${previous.top}, ${controlX} ${point.top}, ${point.x} ${point.top}`;
   }, "");
   const bottomPath = [...points].reverse().reduce((path, point, reverseIndex) => {
     if (reverseIndex === 0) return `L 972 ${point.bottom} L ${point.x} ${point.bottom}`;
     const previous = points[points.length - reverseIndex];
+    if (!previous) return path;
     const controlX = (previous.x + point.x) / 2;
     return `${path} C ${controlX} ${previous.bottom}, ${controlX} ${point.bottom}, ${point.x} ${point.bottom}`;
   }, "");
