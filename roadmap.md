@@ -15,3 +15,8 @@
 - [x] Validar o novo funil em desktop e celular
 - [x] Restaurar StartTrial nos dados, indicadores, funil, gráfico e tabela
 - [x] Validar novamente o dashboard completo em desktop e celular
+- [ ] Remover StartTrial completamente e reorganizar KPIs
+- [ ] Adicionar período personalizado com calendário
+- [ ] Adicionar visualização e paginação por anúncio
+- [ ] Atualizar funil Sankey para cinco etapas
+- [ ] Validar todas as alterações em desktop e celular
