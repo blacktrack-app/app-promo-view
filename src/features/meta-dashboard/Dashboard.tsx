@@ -3,17 +3,20 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  BarChart3,
+  CreditCard,
   DollarSign,
   Download,
   Eye,
   LogOut,
-  MousePointerClick,
-  Percent,
+  Play,
   RefreshCw,
   Search,
   Settings,
   TrendingDown,
   TriangleAlert,
+  UserPlus,
+  Zap,
 } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
@@ -45,12 +48,40 @@ import { currency, getDateRange, integer, percent, periods, shortDate, type Peri
 const AUTH_KEY = "app-install-authenticated";
 const CONFIG_KEY = "app-install-meta-config";
 const emptyData: DashboardData = {
-  summary: { spend: 0, downloads: 0, clicks: 0, ctr: 0, cpm: 0 },
+  summary: {
+    spend: 0,
+    installs: 0,
+    activations: 0,
+    registrations: 0,
+    startTrials: 0,
+    initiatedCheckouts: 0,
+    subscribes: 0,
+    purchases: 0,
+    purchaseValue: 0,
+    subscribeValue: 0,
+    viewContent: 0,
+    searches: 0,
+    detectorQueries: 0,
+    clicks: 0,
+    ctr: 0,
+    cpm: 0,
+  },
   daily: [],
   campaigns: [],
 };
 
-type SortKey = "name" | "status" | "spend" | "downloads" | "cpi" | "clicks";
+type SortKey =
+  | "name"
+  | "status"
+  | "spend"
+  | "installs"
+  | "registrations"
+  | "startTrials"
+  | "initiatedCheckouts"
+  | "acquisitions"
+  | "cpi"
+  | "cpa"
+  | "roas";
 type SortState = { key: SortKey; direction: "asc" | "desc" };
 
 function getInitialConfig(): MetaConfig {
@@ -171,6 +202,8 @@ export function Dashboard() {
           </div>
         )}
         <KpiGrid data={data} loading={loading && !hasLoaded} />
+        <FunnelChart data={data} loading={loading && !hasLoaded} />
+        <EngagementMetrics data={data} loading={loading && !hasLoaded} />
         <PerformanceChart data={data} loading={loading && !hasLoaded} />
         <CampaignTable data={data.campaigns} loading={loading && !hasLoaded} />
       </main>
@@ -335,46 +368,123 @@ function Header(props: {
   );
 }
 
-const kpiDefinitions = [
-  { key: "spend", label: "Total gasto", Icon: DollarSign, tone: "bg-muted text-muted-foreground" },
-  { key: "downloads", label: "Downloads", Icon: Download, tone: "bg-primary text-primary-foreground" },
-  { key: "cpi", label: "Custo por download", Icon: TrendingDown, tone: "bg-warning/15 text-warning" },
-  { key: "cvr", label: "Taxa de download", Icon: Percent, tone: "bg-success/15 text-success" },
-  { key: "clicks", label: "Cliques no link", Icon: MousePointerClick, tone: "bg-info/15 text-info" },
-  { key: "cpm", label: "CPM médio", Icon: Eye, tone: "bg-violet/15 text-violet" },
-] as const;
-
 function KpiGrid({ data, loading }: { data: DashboardData; loading: boolean }) {
   const { summary } = data;
-  const cpi = summary.downloads > 0 ? summary.spend / summary.downloads : null;
-  const cvr = summary.clicks > 0 ? (summary.downloads / summary.clicks) * 100 : null;
-  const values: Record<string, string> = {
-    spend: currency.format(summary.spend),
-    downloads: integer.format(summary.downloads),
-    cpi: cpi === null ? "—" : currency.format(cpi),
-    cvr: cvr === null ? "—" : percent(cvr),
-    clicks: integer.format(summary.clicks),
-    cpm: currency.format(summary.cpm),
-  };
+  const revenue = summary.purchaseValue + summary.subscribeValue;
+  const acquisitions = summary.subscribes + summary.purchases;
+  const cpa = acquisitions > 0 ? summary.spend / acquisitions : null;
+  const roas = summary.spend > 0 ? revenue / summary.spend : null;
+  const financial = [
+    { label: "Investimento", value: currency.format(summary.spend), Icon: DollarSign, tone: "bg-muted text-muted-foreground" },
+    { label: "Faturamento", value: currency.format(revenue), Icon: DollarSign, tone: "bg-success/15 text-success" },
+    { label: "CPA", value: cpa === null ? "—" : currency.format(cpa), Icon: TrendingDown, tone: "bg-warning/15 text-warning" },
+    {
+      label: "ROAS",
+      value: roas === null ? "—" : `${roas.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}x`,
+      Icon: BarChart3,
+      tone: "bg-primary text-primary-foreground",
+      valueTone: roas === null ? "" : roas >= 1 ? "text-success" : "text-destructive",
+    },
+  ];
+  const volume = [
+    { label: "Installs", value: integer.format(summary.installs), Icon: Download, tone: "bg-primary text-primary-foreground" },
+    { label: "Cadastros", value: integer.format(summary.registrations), Icon: UserPlus, tone: "bg-info/15 text-info" },
+    { label: "Trials", value: integer.format(summary.startTrials), Icon: Play, tone: "bg-violet/15 text-violet" },
+    { label: "Assinantes", value: integer.format(acquisitions), Icon: CreditCard, tone: "bg-success/15 text-success" },
+  ];
   return (
-    <section aria-label="Indicadores" className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {kpiDefinitions.map(({ key, label, Icon, tone }) => (
-        <article
-          key={key}
-          className="rounded-xl border border-border bg-card p-5 shadow-lg shadow-shadow/20 transition-colors hover:bg-card-hover"
-        >
-          <div className="flex items-start justify-between">
-            <div className={cn("flex size-10 items-center justify-center rounded-full", tone)}>
-              <Icon className="size-5" />
+    <div className="space-y-6">
+      <KpiSection title="KPIs financeiros" items={financial} loading={loading} />
+      <KpiSection title="KPIs de volume" items={volume} loading={loading} />
+    </div>
+  );
+}
+
+function KpiSection({
+  title,
+  items,
+  loading,
+}: {
+  title: string;
+  items: Array<{ label: string; value: string; Icon: typeof DollarSign; tone: string; valueTone?: string }>;
+  loading: boolean;
+}) {
+  return (
+    <section aria-label={title}>
+      <h2 className="mb-3 text-xs font-semibold uppercase text-muted-foreground">{title}</h2>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {items.map(({ label, value, Icon, tone, valueTone }) => (
+          <article key={label} className="rounded-xl border border-border bg-card p-5 shadow-lg shadow-shadow/20 transition-colors hover:bg-card-hover">
+            <div className="flex items-start justify-between gap-3">
+              <div className={cn("flex size-10 shrink-0 items-center justify-center rounded-full", tone)}><Icon className="size-5" /></div>
+              <span className="text-right text-[11px] font-semibold uppercase text-muted-foreground">{label}</span>
             </div>
-            <span className="text-[11px] font-semibold uppercase text-muted-foreground">{label}</span>
+            {loading ? <Skeleton className="mt-6 h-9 w-36" /> : <p className={cn("mt-5 text-3xl font-bold", valueTone)}>{value}</p>}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FunnelChart({ data, loading }: { data: DashboardData; loading: boolean }) {
+  const { summary } = data;
+  const steps = [
+    { label: "Install", value: summary.installs, color: "var(--primary)" },
+    { label: "Activate", value: summary.activations, color: "var(--funnel-activate)" },
+    { label: "Registration", value: summary.registrations, color: "var(--warning)" },
+    { label: "StartTrial", value: summary.startTrials, color: "var(--violet)" },
+    { label: "InitCheckout", value: summary.initiatedCheckouts, color: "var(--info)" },
+    { label: "Subscribe", value: summary.subscribes + summary.purchases, color: "var(--success)" },
+  ];
+  const maxValue = steps[0]?.value || 1;
+  return (
+    <section className="mt-6 rounded-xl border border-border bg-card p-5 shadow-lg shadow-shadow/20 sm:p-6">
+      <h2 className="font-semibold">Funil de conversão</h2>
+      <p className="mt-1 text-xs text-muted-foreground">Install → Subscribe</p>
+      <div className="mt-7 min-h-60 overflow-x-auto">
+        {loading ? <LoadingState label="Carregando funil" /> : (
+          <div className="flex min-w-[720px] items-end">
+            {steps.map((step, index) => {
+              const width = Math.max((step.value / maxValue) * 100, 5);
+              const nextValue = steps[index + 1]?.value ?? step.value;
+              const nextWidth = Math.max((nextValue / maxValue) * 100, 5);
+              const rate = (step.value / maxValue) * 100;
+              return (
+                <div key={step.label} className="flex min-w-28 flex-1 flex-col items-center">
+                  <span className="mb-2 min-h-8 text-center text-[11px] font-semibold uppercase text-muted-foreground">{step.label}</span>
+                  <svg viewBox="0 0 100 112" className="h-28 w-full" preserveAspectRatio="none" aria-hidden="true">
+                    <polygon points={`${50 - width / 2},0 ${50 + width / 2},0 ${50 + nextWidth / 2},112 ${50 - nextWidth / 2},112`} fill={step.color} opacity="0.82" />
+                  </svg>
+                  <span className="mt-3 text-sm font-bold text-primary">{percent(rate)}</span>
+                  <span className="mt-1 text-base font-semibold">{integer.format(step.value)}</span>
+                </div>
+              );
+            })}
           </div>
-          {loading ? <Skeleton className="mt-6 h-9 w-36" /> : <p className="mt-5 text-3xl font-bold">{values[key]}</p>}
-          {key === "clicks" && !loading && (
-            <p className="mt-1 text-xs font-medium text-primary">CTR: {percent(summary.ctr)}</p>
-          )}
-        </article>
-      ))}
+        )}
+      </div>
+    </section>
+  );
+}
+
+function EngagementMetrics({ data, loading }: { data: DashboardData; loading: boolean }) {
+  const items = [
+    { label: "Abriu Confronto", value: data.summary.viewContent, Icon: Eye },
+    { label: "Buscas", value: data.summary.searches, Icon: Search },
+    { label: "Detector", value: data.summary.detectorQueries, Icon: Zap },
+  ];
+  return (
+    <section className="mt-6 rounded-xl border border-border bg-card p-5 shadow-lg shadow-shadow/20 sm:p-6">
+      <h2 className="font-semibold">Eventos de Engajamento</h2>
+      <div className="mt-5 grid gap-4 sm:grid-cols-3 sm:divide-x sm:divide-border">
+        {items.map(({ label, value, Icon }) => (
+          <div key={label} className="flex items-center gap-4 sm:px-5 first:pl-0 last:pr-0">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-primary"><Icon className="size-5" /></div>
+            <div><p className="text-xs uppercase text-muted-foreground">{label}</p>{loading ? <Skeleton className="mt-2 h-7 w-20" /> : <p className="mt-1 text-2xl font-bold">{integer.format(value)}</p>}</div>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
@@ -385,7 +495,7 @@ function PerformanceChart({ data, loading }: { data: DashboardData; loading: boo
   return (
     <section className="mt-6 rounded-xl border border-border bg-card p-5 shadow-lg shadow-shadow/20 sm:p-6">
       <div>
-        <h2 className="font-semibold">Gasto vs. downloads por dia</h2>
+        <h2 className="font-semibold">Gasto vs. installs vs. assinantes por dia</h2>
         <p className="mt-1 text-xs text-muted-foreground">Evolução diária no período selecionado</p>
       </div>
       <div className="mt-6 h-[320px] w-full">
@@ -404,6 +514,10 @@ function PerformanceChart({ data, loading }: { data: DashboardData; loading: boo
                 <linearGradient id="download-fill" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.32} />
                   <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="subscriber-fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--success)" stopOpacity={0.26} />
+                  <stop offset="95%" stopColor="var(--success)" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid stroke="var(--border)" vertical={false} />
@@ -424,7 +538,7 @@ function PerformanceChart({ data, loading }: { data: DashboardData; loading: boo
                 tickFormatter={(value) => `R$ ${value}`}
               />
               <YAxis
-                yAxisId="downloads"
+                yAxisId="volume"
                 orientation="right"
                 stroke="var(--muted-foreground)"
                 fontSize={11}
@@ -444,12 +558,21 @@ function PerformanceChart({ data, loading }: { data: DashboardData; loading: boo
                 strokeWidth={2}
               />
               <Area
-                yAxisId="downloads"
+                yAxisId="volume"
                 type="monotone"
-                dataKey="downloads"
-                name="Downloads"
+                dataKey="installs"
+                name="Installs"
                 stroke="var(--primary)"
                 fill="url(#download-fill)"
+                strokeWidth={2}
+              />
+              <Area
+                yAxisId="volume"
+                type="monotone"
+                dataKey={(item) => item.subscribes + item.purchases}
+                name="Assinantes"
+                stroke="var(--success)"
+                fill="url(#subscriber-fill)"
                 strokeWidth={2}
               />
             </AreaChart>
@@ -468,7 +591,7 @@ function ChartTooltip({
   label,
 }: {
   active?: boolean;
-  payload?: Array<{ payload: { spend: number; downloads: number; cpi: number | null } }>;
+  payload?: Array<{ payload: DashboardData["daily"][number] }>;
   label?: string;
 }) {
   if (!active || !payload?.[0]) return null;
@@ -480,10 +603,19 @@ function ChartTooltip({
         Gasto: <span className="text-foreground">{currency.format(item.spend)}</span>
       </p>
       <p className="text-muted-foreground">
-        Downloads: <span className="text-foreground">{integer.format(item.downloads)}</span>
+        Installs: <span className="text-foreground">{integer.format(item.installs)}</span>
       </p>
       <p className="text-muted-foreground">
-        CPI: <span className="text-foreground">{item.cpi === null ? "—" : currency.format(item.cpi)}</span>
+        Cadastros: <span className="text-foreground">{integer.format(item.registrations)}</span>
+      </p>
+      <p className="text-muted-foreground">
+        Trials: <span className="text-foreground">{integer.format(item.startTrials)}</span>
+      </p>
+      <p className="text-muted-foreground">
+        Assinantes: <span className="text-foreground">{integer.format(item.subscribes + item.purchases)}</span>
+      </p>
+      <p className="text-muted-foreground">
+        Receita: <span className="text-foreground">{currency.format(item.purchaseValue + item.subscribeValue)}</span>
       </p>
     </div>
   );
@@ -501,8 +633,9 @@ function CampaignTable({ data, loading }: { data: CampaignMetric[]; loading: boo
       data
         .filter((campaign) => campaign.name.toLocaleLowerCase("pt-BR").includes(search.toLocaleLowerCase("pt-BR")))
         .sort((a, b) => {
-          const first = a[sort.key] ?? -1;
-          const second = b[sort.key] ?? -1;
+          const value = (campaign: CampaignMetric) => sort.key === "acquisitions" ? campaign.subscribes + campaign.purchases : campaign[sort.key];
+          const first = value(a) ?? -1;
+          const second = value(b) ?? -1;
           const result =
             typeof first === "string" ? first.localeCompare(String(second), "pt-BR") : Number(first) - Number(second);
           return sort.direction === "asc" ? result : -result;
@@ -548,9 +681,14 @@ function CampaignTable({ data, loading }: { data: CampaignMetric[]; loading: boo
                 ["name", "Campanha"],
                 ["status", "Status"],
                 ["spend", "Gasto"],
-                ["downloads", "Downloads"],
+                ["installs", "Installs"],
+                ["registrations", "Registros"],
+                ["startTrials", "Trials"],
+                ["initiatedCheckouts", "Checkouts"],
+                ["acquisitions", "Assinantes"],
                 ["cpi", "CPI"],
-                ["clicks", "Cliques"],
+                ["cpa", "CPA"],
+                ["roas", "ROAS"],
               ].map(([key, label]) => (
                 <TableHead key={key} className={cn("px-5", key !== "name" && key !== "status" && "text-right")}>
                   <Button
@@ -571,7 +709,7 @@ function CampaignTable({ data, loading }: { data: CampaignMetric[]; loading: boo
               <TableRow
                 key={campaign.id}
                 className={cn(
-                  campaign.downloads === 0 && campaign.spend > 0 && "bg-destructive/5 hover:bg-destructive/10",
+                  campaign.installs === 0 && campaign.spend > 0 && "bg-destructive/5 hover:bg-destructive/10",
                 )}
               >
                 <TableCell className="min-w-64 px-5 py-4 font-medium">{campaign.name}</TableCell>
@@ -579,7 +717,11 @@ function CampaignTable({ data, loading }: { data: CampaignMetric[]; loading: boo
                   <StatusBadge status={campaign.status} />
                 </TableCell>
                 <TableCell className="px-5 text-right">{currency.format(campaign.spend)}</TableCell>
-                <TableCell className="px-5 text-right">{integer.format(campaign.downloads)}</TableCell>
+                <TableCell className="px-5 text-right">{integer.format(campaign.installs)}</TableCell>
+                <TableCell className="px-5 text-right">{integer.format(campaign.registrations)}</TableCell>
+                <TableCell className="px-5 text-right">{integer.format(campaign.startTrials)}</TableCell>
+                <TableCell className="px-5 text-right">{integer.format(campaign.initiatedCheckouts)}</TableCell>
+                <TableCell className="px-5 text-right">{integer.format(campaign.subscribes + campaign.purchases)}</TableCell>
                 <TableCell
                   className={cn(
                     "px-5 text-right",
@@ -591,7 +733,10 @@ function CampaignTable({ data, loading }: { data: CampaignMetric[]; loading: boo
                 >
                   {campaign.cpi === null ? "—" : currency.format(campaign.cpi)}
                 </TableCell>
-                <TableCell className="px-5 text-right">{integer.format(campaign.clicks)}</TableCell>
+                <TableCell className="px-5 text-right">{campaign.cpa === null ? "—" : currency.format(campaign.cpa)}</TableCell>
+                <TableCell className={cn("px-5 text-right font-semibold", campaign.roas !== null && (campaign.roas >= 1 ? "text-success" : "text-destructive"))}>
+                  {campaign.roas === null ? "—" : `${campaign.roas.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}x`}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
