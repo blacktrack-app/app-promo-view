@@ -436,7 +436,7 @@ function FunnelChart({ data, loading }: { data: DashboardData; loading: boolean 
   const chartWidth = 1000;
   const centerY = 142;
   const maxHalfHeight = 68;
-  const minHalfHeight = 5;
+  const minHalfHeight = 12;
   const firstX = 100;
   const lastX = 900;
   const stepGap = (lastX - firstX) / Math.max(steps.length - 1, 1);
@@ -483,7 +483,7 @@ function FunnelChart({ data, loading }: { data: DashboardData; loading: boolean 
                 <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.9" />
                 <stop offset="36%" stopColor="var(--warning)" stopOpacity="0.86" />
                 <stop offset="72%" stopColor="var(--success)" stopOpacity="0.78" />
-                <stop offset="100%" stopColor="var(--info)" stopOpacity="0.88" />
+                <stop offset="100%" stopColor="var(--chart-2)" stopOpacity="0.88" />
               </linearGradient>
             </defs>
             {points.slice(1).map((point) => (
@@ -496,7 +496,7 @@ function FunnelChart({ data, loading }: { data: DashboardData; loading: boolean 
                   {point.label}
                 </text>
                 <text x={point.x} y={centerY + 4} textAnchor="middle" fill="var(--primary-foreground)" fontSize="14" fontWeight="700">
-                  {percent(point.ratio * 100)}
+                  {(point.ratio * 100).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
                 </text>
                 <text x={point.x} y="258" textAnchor="middle" fill="var(--foreground)" fontSize="15" fontWeight="700">
                   {integer.format(point.value)}
