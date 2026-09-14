@@ -10,13 +10,10 @@
 - [x] Adicionar funil e eventos de engajamento
 - [x] Atualizar gráfico temporal e tabela de campanhas
 - [x] Validar cálculos e responsividade
-- [x] Remover StartTrial de dados, indicadores, gráfico e tabela
 - [x] Redesenhar o funil como fluxo Sankey contínuo
 - [x] Validar o novo funil em desktop e celular
-- [x] Restaurar StartTrial nos dados, indicadores, funil, gráfico e tabela
-- [x] Validar novamente o dashboard completo em desktop e celular
-- [ ] Remover StartTrial completamente e reorganizar KPIs
-- [ ] Adicionar período personalizado com calendário
-- [ ] Adicionar visualização e paginação por anúncio
-- [ ] Atualizar funil Sankey para cinco etapas
-- [ ] Validar todas as alterações em desktop e celular
+- [x] Remover o evento descontinuado completamente e reorganizar KPIs
+- [x] Adicionar período personalizado com calendário
+- [x] Adicionar visualização e paginação por anúncio
+- [x] Atualizar funil Sankey para cinco etapas
+- [x] Validar todas as alterações em desktop e celular
