@@ -9,4 +9,4 @@
 - [x] Atualizar KPIs financeiros e de volume
 - [x] Adicionar funil e eventos de engajamento
 - [x] Atualizar gráfico temporal e tabela de campanhas
-- [ ] Validar cálculos e responsividade
+- [x] Validar cálculos e responsividade
