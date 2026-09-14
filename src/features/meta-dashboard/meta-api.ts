@@ -5,6 +5,8 @@ export type Action = { action_type: string; value: string };
 type Insight = {
   campaign_name?: string;
   campaign_id?: string;
+  ad_name?: string;
+  ad_id?: string;
   spend?: string;
   actions?: Action[];
   action_values?: Action[];
@@ -14,7 +16,7 @@ type Insight = {
   date_start?: string;
 };
 
-type CampaignStatus = { id: string; status: string };
+type DeliveryStatus = { id: string; status: string };
 type MetaResponse<T> = { data?: T[]; error?: { code?: number; message?: string } };
 
 export type EventMetrics = {
@@ -22,7 +24,6 @@ export type EventMetrics = {
   installs: number;
   activations: number;
   registrations: number;
-  startTrials: number;
   initiatedCheckouts: number;
   subscribes: number;
   purchases: number;
@@ -38,15 +39,18 @@ export type EventMetrics = {
 
 export type Summary = EventMetrics;
 export type DailyMetric = EventMetrics & { date: string };
-export type CampaignMetric = EventMetrics & {
+export type PerformanceMetric = EventMetrics & {
   id: string;
   name: string;
+  campaignName?: string;
   status: string;
   cpi: number | null;
   cpa: number | null;
   roas: number | null;
 };
-export type DashboardData = { summary: Summary; daily: DailyMetric[]; campaigns: CampaignMetric[] };
+export type CampaignMetric = PerformanceMetric;
+export type AdMetric = PerformanceMetric & { campaignName: string };
+export type DashboardData = { summary: Summary; daily: DailyMetric[]; campaigns: CampaignMetric[]; ads: AdMetric[] };
 
 export class MetaApiError extends Error {
   constructor(message: string, public code?: number) {
@@ -83,7 +87,6 @@ export function processInsight(data: Insight | undefined): EventMetrics {
     installs: getActionValue(actions, "mobile_app_install"),
     activations: getActionValue(actions, "app_custom_event.fb_mobile_activate_app"),
     registrations: getActionValue(actions, "app_custom_event.fb_mobile_complete_registration"),
-    startTrials: getActionValue(actions, "app_custom_event.fb_mobile_start_trial"),
     initiatedCheckouts: getActionValue(actions, "app_custom_event.fb_mobile_initiated_checkout"),
     subscribes: getActionValue(actions, "app_custom_event.fb_mobile_subscribe"),
     purchases: getActionValue(actions, "app_custom_event.fb_mobile_purchase"),
@@ -129,7 +132,7 @@ export async function testMetaConnection(token: string) {
 export async function fetchDashboard(config: MetaConfig, range: DateRange): Promise<DashboardData> {
   const account = accountPath(config.accountId);
   const rangeValue = timeRange(range);
-  const [summaryRows, dailyRows, campaignRows, statusRows] = await Promise.all([
+  const [summaryRows, dailyRows, campaignRows, campaignStatusRows, adRows, adStatusRows] = await Promise.all([
     request<Insight>(account + "/insights", { fields: insightFields, time_range: rangeValue }, config.token),
     request<Insight>(account + "/insights", {
       fields: insightFields,
@@ -143,22 +146,59 @@ export async function fetchDashboard(config: MetaConfig, range: DateRange): Prom
       time_range: rangeValue,
       limit: "100",
     }, config.token),
-    request<CampaignStatus>(account + "/campaigns", { fields: "id,name,status", limit: "100" }, config.token),
+    request<DeliveryStatus>(account + "/campaigns", { fields: "id,name,status", limit: "100" }, config.token),
+    request<Insight>(account + "/insights", {
+      fields: `ad_name,ad_id,campaign_name,${insightFields}`,
+      level: "ad",
+      time_range: rangeValue,
+      limit: "200",
+    }, config.token),
+    request<DeliveryStatus>(account + "/ads", { fields: "id,name,status", limit: "200" }, config.token),
   ]);
 
-  const statuses = new Map(statusRows.map((campaign) => [campaign.id, campaign.status]));
-  const campaigns = campaignRows.map((campaign) => {
-    const metrics = processInsight(campaign);
+  const toPerformanceMetric = (
+    insight: Insight,
+    id: string,
+    name: string,
+    status: string,
+    campaignName?: string,
+  ): PerformanceMetric => {
+    const metrics = processInsight(insight);
     const acquisitions = metrics.subscribes + metrics.purchases;
     const revenue = metrics.purchaseValue + metrics.subscribeValue;
     return {
       ...metrics,
-      id: campaign.campaign_id ?? campaign.campaign_name ?? crypto.randomUUID(),
-      name: campaign.campaign_name ?? "Campanha sem nome",
-      status: statuses.get(campaign.campaign_id ?? "") ?? "UNKNOWN",
+      id,
+      name,
+      ...(campaignName ? { campaignName } : {}),
+      status,
       cpi: metrics.installs > 0 ? metrics.spend / metrics.installs : null,
       cpa: acquisitions > 0 ? metrics.spend / acquisitions : null,
       roas: metrics.spend > 0 ? revenue / metrics.spend : null,
+    };
+  };
+  const campaignStatuses = new Map(campaignStatusRows.map((campaign) => [campaign.id, campaign.status]));
+  const campaigns = campaignRows.map((campaign) => {
+    const id = campaign.campaign_id ?? campaign.campaign_name ?? crypto.randomUUID();
+    return toPerformanceMetric(
+      campaign,
+      id,
+      campaign.campaign_name ?? "Campanha sem nome",
+      campaignStatuses.get(campaign.campaign_id ?? "") ?? "UNKNOWN",
+    );
+  });
+  const adStatuses = new Map(adStatusRows.map((ad) => [ad.id, ad.status]));
+  const ads: AdMetric[] = adRows.map((ad) => {
+    const id = ad.ad_id ?? ad.ad_name ?? crypto.randomUUID();
+    return {
+      ...toPerformanceMetric(
+        ad,
+        id,
+        ad.ad_name ?? "Anúncio sem nome",
+        adStatuses.get(ad.ad_id ?? "") ?? "UNKNOWN",
+        ad.campaign_name ?? "Campanha sem nome",
+      ),
+      campaignName: ad.campaign_name ?? "Campanha sem nome",
     };
   });
 
@@ -166,5 +206,6 @@ export async function fetchDashboard(config: MetaConfig, range: DateRange): Prom
     summary: processInsight(summaryRows[0]),
     daily: dailyRows.map((day) => ({ ...processInsight(day), date: day.date_start ?? "" })),
     campaigns,
+    ads,
   };
 }

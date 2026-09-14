@@ -67,6 +67,11 @@
   --color-info: var(--info);
   --color-violet: var(--violet);
   --color-funnel-activate: var(--funnel-activate);
+  --color-funnel-gold: var(--funnel-gold);
+  --color-funnel-bronze: var(--funnel-bronze);
+  --color-funnel-orange: var(--funnel-orange);
+  --color-funnel-mint: var(--funnel-mint);
+  --color-funnel-green: var(--funnel-green);
   --color-shadow: var(--shadow);
 }
 
@@ -99,6 +104,11 @@
   --info: oklch(0.623 0.214 259.8);
   --violet: oklch(0.702 0.183 293.5);
   --funnel-activate: oklch(0.7 0.15 110);
+  --funnel-gold: oklch(0.82 0.09 99);
+  --funnel-bronze: oklch(0.75 0.10 82);
+  --funnel-orange: oklch(0.76 0.14 62);
+  --funnel-mint: oklch(0.81 0.11 157);
+  --funnel-green: oklch(0.76 0.19 145);
   --shadow: oklch(0 0 0);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);

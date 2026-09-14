@@ -1,13 +1,14 @@
 import { endOfMonth, format, startOfMonth, subDays } from "date-fns";
 import type { DateRange } from "./meta-api";
 
-export type PeriodKey = "today" | "yesterday" | "7days" | "30days" | "month";
+export type PeriodKey = "today" | "yesterday" | "7days" | "30days" | "month" | "custom";
 export const periods: { key: PeriodKey; label: string }[] = [
   { key: "today", label: "Hoje" },
   { key: "yesterday", label: "Ontem" },
   { key: "7days", label: "Últimos 7 dias" },
   { key: "30days", label: "Últimos 30 dias" },
   { key: "month", label: "Este mês" },
+  { key: "custom", label: "Personalizado" },
 ];
 const iso = (date: Date) => format(date, "yyyy-MM-dd");
 export function getDateRange(period: PeriodKey): DateRange {
