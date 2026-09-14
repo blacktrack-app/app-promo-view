@@ -389,7 +389,7 @@ function KpiGrid({ data, loading }: { data: DashboardData; loading: boolean }) {
   const volume = [
     { label: "Installs", value: integer.format(summary.installs), Icon: Download, tone: "bg-primary text-primary-foreground" },
     { label: "Cadastros", value: integer.format(summary.registrations), Icon: UserPlus, tone: "bg-info/15 text-info" },
-    { label: "Trials", value: integer.format(summary.startTrials), Icon: Play, tone: "bg-funnel-trial/15 text-funnel-trial" },
+    { label: "Trials", value: integer.format(summary.startTrials), Icon: Play, tone: "bg-violet/15 text-violet" },
     { label: "Assinantes", value: integer.format(acquisitions), Icon: CreditCard, tone: "bg-success/15 text-success" },
   ];
   return (
